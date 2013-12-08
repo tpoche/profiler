@@ -10,5 +10,5 @@
 
 # Ignore other unneeded files.
 .DS_Store
-sample_app.sublime-project
-sample_app.sublime-workspace
+*.sublime-project
+*.sublime-workspace
