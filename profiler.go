@@ -66,17 +66,35 @@ func main() {
 	p := new(Profile)
 	xml.Unmarshal(b, p)
 
-	fmt.Println("Profile License Type: ", p.UserLicense)
+	// process field permissions
 	for i, f := range p.FieldPermList {
 		fmt.Printf("\tOld Value - Index: %d - Field: %v\n", i, f.Field)
 		if !f.Editable {
-			f.Editable = true
-			fmt.Println("\t\tSetting editable field permission")
+			//f.Editable = true
+			p.FieldPermList[i].Editable = true
 		} 
 		if !f.Readable {
-			f.Readable = true
-			fmt.Println("\t\tSetting readable field permission")
+			//f.Readable = true
+			p.FieldPermList[i].Readable = true
 		}
 	}
-	
+
+	// write modified profile to file
+	out, err := xml.MarshalIndent(p, "", "    ")
+	if err != nil {
+		fmt.Printf("Error marshaling XML: %v\n", err)
+		return
+	}
+	fout, err := os.Create(path + "/out/Accounting.profile")
+	if err != nil {
+		fmt.Println("Error creating file: ", err)
+		return
+	}
+	n, err := fout.Write(out)
+	if err != nil {
+		fmt.Println("Error writing file: ", err)
+		return
+	} else {
+		fmt.Println("Updated profile written to file! Number of lines: ", n)
+	}	
 }
