@@ -40,9 +40,13 @@ type RecordTypeVisibilities struct {
 }
 
 var path string
+var objects string
+var fileOutput bool
 
 func init() {
 	flag.StringVar(&path, "filepath", ".", "base filepath for the program")
+	flag.StringVar(&objects, "o", "", "comma separated list of objects to perform processing on (defaults to all objects found in profile)")
+	flag.BoolVar(&fileOutput, "f", false, "enable writing output to file")
 }
 
 func NewProfileFromFile(filepath string) (*Profile, error) {
@@ -104,13 +108,19 @@ func (p *Profile) WriteToFile(filepath string) (int, error) {
 	return nb, nil
 }
 
-func (p *Profile) UpdateFieldPerms(objName string, rd bool, ed bool) (int, error) {
-	if objName == "" {
-		return 0, errors.New("UpdateFieldPerms: Object name must be specified")
+func (p *Profile) UpdateFieldPerms(rd bool, ed bool) (int, error) {
+	obs, err := p.mapUserObjects(objects)
+	if obs == nil || err != nil {
+		return 0, errors.New("failed to create object map")
 	}
 	count := 0
 	for i, v := range p.FieldPermList {
-		if strings.HasPrefix(v.Field, objName) {
+		fullName := strings.Split(v.Field, ".")
+		if len(fullName) != 2 {
+			return 0, errors.New("invalid field permission name encountered")
+		}
+		objName  := fullName[0]
+		if obs[objName] == true {
 			if v.Readable != rd {
 				p.FieldPermList[i].Readable = rd
 				count += 1
@@ -122,6 +132,31 @@ func (p *Profile) UpdateFieldPerms(objName string, rd bool, ed bool) (int, error
 		}		
 	}
 	return count, nil
+}
+
+func (p *Profile) mapUserObjects(userObjs string) (map[string]bool, error) {
+	objMap := make(map[string]bool)
+	objsFromProfile, err := p.GetObjectsWithFieldPerms()
+	if err != nil {
+		return nil, err
+	}
+	if objects == "" {
+		// all objects specified
+		for _, v := range objsFromProfile {
+			objMap[v] = true
+		}
+		return objMap, nil
+	}
+	
+	objs := strings.Split(objects, ",")
+	for _, v := range objs {
+		for _, x := range objsFromProfile {
+			if v == x {
+				objMap[x] = true
+			}
+		}
+	}
+	return objMap, nil
 }
 
 func (p *Profile) GetObjectsWithFieldPerms() ([]string, error) {
@@ -138,7 +173,6 @@ func (p *Profile) GetObjectsWithFieldPerms() ([]string, error) {
 	}
 
 	keys := make([]string, len(objMap))
-
 	for k, _ := range objMap {
 		keys = append(keys, k)
 	}
@@ -147,23 +181,10 @@ func (p *Profile) GetObjectsWithFieldPerms() ([]string, error) {
 
 func main() {	
 	flag.Parse()
-	p, err := NewProfileFromFile(path + "/profiles/Accounting.profile")
+	p, err := NewProfileFromFile(path + "/profiles/BillingSupport.profile")
 	if err != nil {
 		fmt.Println(err)
 		return
-	}
-
-	// process field permissions
-	for i, f := range p.FieldPermList {
-		fmt.Printf("\tOld Value - Index: %d - Field: %v\n", i, f.Field)
-		if !f.Editable {
-			//f.Editable = true
-			p.FieldPermList[i].Editable = true
-		} 
-		if !f.Readable {
-			//f.Readable = true
-			p.FieldPermList[i].Readable = true
-		}
 	}
 
 	objs, err := p.GetObjectsWithFieldPerms()
@@ -171,14 +192,22 @@ func main() {
 		fmt.Println(err)
 		return
 	} 
-
 	fmt.Println("Objects with Field Permissions found: ", objs)
-
-	n, err := p.WriteToFile(path + "/out/Accounting2.profile")
+	
+	c, err := p.UpdateFieldPerms(true, true)
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
+	fmt.Println("Updated field permissions successfully! Modified perm count: ", c)
 
-	fmt.Printf("Modified profile file created with size: %d\n", n)	
+	
+	if fileOutput {
+		n, err := p.WriteToFile(path + "/out/BillingSupport.profile")
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+		fmt.Printf("Modified profile file created with size: %d\n", n)	
+	}	
 }
