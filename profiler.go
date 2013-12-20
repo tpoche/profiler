@@ -124,6 +124,27 @@ func (p *Profile) UpdateFieldPerms(objName string, rd bool, ed bool) (int, error
 	return count, nil
 }
 
+func (p *Profile) GetObjectsWithFieldPerms() ([]string, error) {
+	objMap := make(map[string]int)
+
+	for _, v := range p.FieldPermList {
+		fieldFull := strings.Split(v.Field, ".")
+		if len(fieldFull) != 2 {
+			return nil, errors.New("ListObjectsWithFieldPerms: Invalid field name")
+		} 
+		
+		curr := fieldFull[0]
+		objMap[curr] += 1
+	}
+
+	keys := make([]string, len(objMap))
+
+	for k, _ := range objMap {
+		keys = append(keys, k)
+	}
+	return keys, nil
+}
+
 func main() {	
 	flag.Parse()
 	p, err := NewProfileFromFile(path + "/profiles/Accounting.profile")
@@ -144,6 +165,14 @@ func main() {
 			p.FieldPermList[i].Readable = true
 		}
 	}
+
+	objs, err := p.GetObjectsWithFieldPerms()
+	if err != nil {
+		fmt.Println(err)
+		return
+	} 
+
+	fmt.Println("Objects with Field Permissions found: ", objs)
 
 	n, err := p.WriteToFile(path + "/out/Accounting2.profile")
 	if err != nil {
